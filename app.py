@@ -444,12 +444,9 @@ if page == "🏠 Home":
         "Open the quiz generator to create your first quiz."
     )
 
-    if st.button(
-        "🚀 Open Quiz Generator",
-        use_container_width=True,
-    ):
-        st.session_state["ua_navigation"] = "📝 Quiz Generator"
-        st.rerun()
+    if st.button("🚀 Open Quiz Generator", use_container_width=True):
+    st.session_state["page_choice"] = "📝 Quiz Generator"
+    st.rerun()
         # ============== QUIZ GENERATOR ==============
 
 elif page == "📝 Quiz Generator":
