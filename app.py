@@ -35,12 +35,68 @@ st.markdown("""
 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
 );
 
+.stApp {/* Animated Gradient Background */
 .stApp {
     background: linear-gradient(
-        135deg, #0b1020, #10172d, #15132e
+        -45deg,
+        #0f172a,
+        #312e81,
+        #581c87,
+        #164e63,
+        #0f172a
     );
-    color: #f1f5f9;
-    font-family: 'Inter', sans-serif;
+    background-size: 400% 400%;
+    animation: gradientMove 15s ease infinite;
+    color: #f8fafc;
+}
+
+@keyframes gradientMove {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Transparent Main Content */
+[data-testid="stMainBlockContainer"] {
+    background: transparent;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: linear-gradient(
+        180deg,
+        #111827,
+        #312e81,
+        #581c87
+    );
+}
+
+/* Premium Buttons */
+.stButton > button {
+    background: linear-gradient(
+        90deg,
+        #6366f1,
+        #a855f7,
+        #06b6d4
+    );
+    background-size: 200% 200%;
+    color: white;
+    border: 1px solid #818cf8;
+    border-radius: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-position: 100% 50%;
+    border-color: #22d3ee;
+    transform: translateY(-2px);
 }
 
 [data-testid="stHeader"] {
