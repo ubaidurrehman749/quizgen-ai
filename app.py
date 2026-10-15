@@ -256,4 +256,358 @@ if page == "🏠 Home":
         st.markdown(
             """
             <div class="section-card">
-                <
+                <h3>🤖 AI Quiz</h3>
+                <p>Create quizzes from your documents.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        st.markdown(
+            """
+            <div class="section-card">
+                <h3>📊 Results</h3>
+                <p>Review answers and check your score.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("### Get started")
+
+    if st.button("🚀 Open Quiz Generator", use_container_width=True):
+        st.session_state["navigation_target"] = "📝 Quiz Generator"
+        st.rerun()
+
+
+# ---------------- QUIZ GENERATOR ----------------
+
+elif page == "📝 Quiz Generator":
+
+    show_hero()
+
+    st.subheader("Create your quiz")
+    st.caption(
+        "Upload your study material and customize your quiz settings."
+    )
+
+    if not api_key:
+        st.warning(
+            "Gemini API key is missing. Add GEMINI_API_KEY "
+            "in your Streamlit app Secrets."
+        )
+
+    uploaded_file = st.file_uploader(
+        "📂 Upload your document",
+        type=["pdf", "docx", "txt", "md"],
+        help="Supported formats: PDF, Word, TXT and Markdown.",
+    )
+
+    if uploaded_file:
+        st.success(f"Selected file: {uploaded_file.name}")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        question_count = st.selectbox(
+            "Number of questions",
+            [5, 10, 15, 20, 30, 50],
+            index=1,
+        )
+
+        question_type = st.selectbox(
+            "Question type",
+            ["MCQ", "True/False", "Short Answer"],
+        )
+
+    with col2:
+        language = st.selectbox(
+            "Quiz language",
+            ["English", "Urdu"],
+        )
+
+        difficulty = st.selectbox(
+            "Difficulty",
+            ["Easy", "Medium", "Hard"],
+        )
+
+    if st.button("✨ Generate My Quiz", use_container_width=True):
+
+        if not uploaded_file:
+            st.error("Please upload a document first.")
+
+        elif not api_key:
+            st.error("Configure your Gemini API key first.")
+
+        else:
+            try:
+                with st.spinner("📖 Reading your document..."):
+                    document_text = extract_text(uploaded_file)
+
+                if not document_text or not document_text.strip():
+                    st.error(
+                        "No readable text found. "
+                        "Please upload a text-based document."
+                    )
+                    st.stop()
+
+                with st.spinner("🤖 AI is creating your quiz..."):
+
+                    quiz = create_quiz(
+                        api_key=api_key,
+                        document_text=document_text,
+                        question_count=question_count,
+                        question_type=question_type,
+                        language=language,
+                        difficulty=difficulty,
+                    )
+
+                st.session_state["quiz"] = quiz
+                st.session_state["answers"] = {}
+                st.session_state["submitted"] = False
+                st.session_state["last_result"] = None
+
+                st.success("Your quiz is ready!")
+
+            except Exception as exc:
+                st.error(
+                    "Unable to generate your quiz. "
+                    "Please try again."
+                )
+
+                with st.expander("Technical details"):
+                    st.code(str(exc))
+
+    quiz = st.session_state.get("quiz")
+
+    if quiz:
+
+        st.divider()
+        st.subheader(quiz.get("title", "Your Quiz"))
+
+        questions = quiz.get("questions", [])
+
+        if not st.session_state.get("submitted", False):
+
+            with st.form("ua_quiz_form"):
+
+                selected_answers = {}
+
+                for index, item in enumerate(questions):
+
+                    st.markdown(f"### Question {index + 1}")
+                    st.write(item["question"])
+
+                    options = item.get("options", [])
+
+                    if options:
+                        selected_answers[index] = st.radio(
+                            "Choose your answer",
+                            options,
+                            key=f"ua_question_{index}",
+                            index=None,
+                        )
+                    else:
+                        selected_answers[index] = st.text_input(
+                            "Write your answer",
+                            key=f"ua_question_{index}",
+                        )
+
+                    st.divider()
+
+                submitted = st.form_submit_button(
+                    "Submit My Quiz",
+                    use_container_width=True,
+                )
+
+                if submitted:
+                    st.session_state["answers"] = selected_answers
+                    st.session_state["submitted"] = True
+                    st.rerun()
+
+        else:
+
+            answers = st.session_state.get("answers", {})
+            score = 0
+
+            st.subheader("📊 Quiz Results")
+
+            for index, item in enumerate(questions):
+
+                user_answer = answers.get(index)
+                correct_answer = item["answer"]
+
+                if isinstance(user_answer, str):
+                    user_answer = user_answer.strip()
+
+                is_correct = (
+                    isinstance(user_answer, str)
+                    and user_answer.casefold()
+                    == correct_answer.strip().casefold()
+                )
+
+                if is_correct:
+                    score += 1
+
+                with st.container(border=True):
+
+                    st.markdown(f"### Question {index + 1}")
+                    st.write(item["question"])
+
+                    st.write(
+                        f"**Your answer:** "
+                        f"{user_answer if user_answer else 'Not answered'}"
+                    )
+
+                    st.write(f"**Correct answer:** {correct_answer}")
+
+                    if is_correct:
+                        st.success("Correct!")
+                    else:
+                        st.error("Incorrect")
+
+                    explanation = item.get("explanation", "")
+
+                    if explanation:
+                        st.info(f"Explanation: {explanation}")
+
+            total = len(questions)
+            percentage = score / total * 100 if total else 0
+
+            st.divider()
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("Score", f"{score}/{total}")
+
+            with col2:
+                st.metric("Percentage", f"{percentage:.1f}%")
+
+            with col3:
+                st.metric(
+                    "Incorrect",
+                    str(total - score),
+                )
+
+            st.progress(int(percentage))
+
+            if percentage >= 80:
+                st.success("Excellent work! 🌟")
+            elif percentage >= 50:
+                st.info("Good effort! Keep practising. 💪")
+            else:
+                st.warning("Review the material and try again. 📚")
+
+            result_data = {
+                "quiz": quiz,
+                "answers": {
+                    str(key): value
+                    for key, value in answers.items()
+                },
+                "score": score,
+                "total": total,
+                "percentage": round(percentage, 2),
+            }
+
+            st.session_state["last_result"] = result_data
+
+            st.download_button(
+                "📥 Download Results (JSON)",
+                data=json.dumps(
+                    result_data,
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                file_name="ua_quiz_ai_results.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+            if st.button("🔄 Take Quiz Again", use_container_width=True):
+                st.session_state["answers"] = {}
+                st.session_state["submitted"] = False
+                st.rerun()
+
+
+# ---------------- MY RESULTS ----------------
+
+elif page == "📊 My Results":
+
+    show_hero()
+
+    st.subheader("Your latest quiz results")
+
+    result = st.session_state.get("last_result")
+
+    if result:
+
+        total = result.get("total", 0)
+        score = result.get("score", 0)
+        percentage = result.get("percentage", 0)
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Score", f"{score}/{total}")
+
+        with col2:
+            st.metric("Percentage", f"{percentage:.1f}%")
+
+        with col3:
+            st.metric("Questions", total)
+
+        st.progress(int(percentage))
+
+        st.download_button(
+            "📥 Download Latest Results",
+            data=json.dumps(
+                result,
+                ensure_ascii=False,
+                indent=2,
+            ),
+            file_name="ua_quiz_ai_results.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    else:
+        st.info(
+            "You have no completed quiz results in this session yet. "
+            "Generate and submit a quiz to see your results here."
+        )
+
+
+# ---------------- ABOUT ----------------
+
+elif page == "ℹ️ About":
+
+    show_hero()
+
+    st.subheader("About UA Quiz AI")
+
+    st.write(
+        """
+        **UA Quiz AI** is an AI-powered learning application
+        that transforms study documents into interactive quizzes.
+
+        Upload supported documents, select your quiz settings,
+        answer the questions, and review your results.
+        """
+    )
+
+    st.markdown("### Features")
+
+    st.markdown(
+        """
+        - 📄 PDF, DOCX, TXT and Markdown support
+        - 🧠 AI-generated quizzes
+        - 🎯 Adjustable difficulty
+        - 🌐 English and Urdu options
+        - 📊 Instant scoring and explanations
+        - 📥 Downloadable quiz results
+        """
+    )
+
+    st.caption("UA Quiz AI | Learn smarter with AI.")
