@@ -611,4 +611,149 @@ elif page == "📝 Quiz Generator":
                         f"{user_answer if user_answer else 'Not answered'}"
                     )
 
-                    st.write(f"**Correct Answer:** {correct_answer}"
+                    st.write(f"**Correct Answer:** {correct_answer}")
+
+                    if is_correct:
+                        st.success("✅ Correct!")
+                    else:
+                        st.error("❌ Incorrect")
+
+                    explanation = item.get("explanation", "")
+
+                    if explanation:
+                        st.info(f"💡 Explanation: {explanation}")
+
+            total = len(questions)
+            percentage = score / total * 100 if total else 0
+
+            st.divider()
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("Score", f"{score}/{total}")
+
+            with col2:
+                st.metric("Percentage", f"{percentage:.1f}%")
+
+            with col3:
+                st.metric("Incorrect", str(total - score))
+
+            st.progress(int(percentage))
+
+            if percentage >= 80:
+                st.success("🌟 Excellent work!")
+            elif percentage >= 50:
+                st.info("💪 Good effort! Keep practising.")
+            else:
+                st.warning("📚 Review the material and try again.")
+
+            result_data = {
+                "quiz": quiz,
+                "answers": {
+                    str(key): value
+                    for key, value in answers.items()
+                },
+                "score": score,
+                "total": total,
+                "percentage": round(percentage, 2),
+            }
+
+            st.session_state["last_result"] = result_data
+
+            st.download_button(
+                "📥 Download Results (JSON)",
+                data=json.dumps(
+                    result_data,
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                file_name="ua_quiz_ai_results.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+            if st.button(
+                "🔄 Take Quiz Again",
+                use_container_width=True,
+            ):
+                st.session_state["answers"] = {}
+                st.session_state["submitted"] = False
+                st.rerun()
+
+
+# ============== MY RESULTS ==============
+
+elif page == "📊 My Results":
+
+    show_hero(
+        "📊 My Results",
+        "Review your latest quiz performance.",
+    )
+
+    if st.session_state.get("last_result"):
+        result = st.session_state["last_result"]
+
+        st.success("Your latest quiz result")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Score", f"{result['score']} / {result['total']}")
+
+        with col2:
+            st.metric("Percentage", f"{result['percentage']}%")
+
+        with col3:
+            st.metric("Correct Answers", result["score"])
+
+        st.progress(min(max(result["percentage"] / 100, 0.0), 1.0))
+
+        st.write("**Quiz:**", result["quiz"].get("title", "Your Quiz"))
+
+    else:
+        st.info(
+            "No quiz results yet. Generate a quiz and submit your answers "
+            "to see your performance here."
+        )
+
+
+# ============== ABOUT ==============
+
+elif page == "ℹ️ About":
+
+    show_hero(
+        "ℹ️ About UA Quiz AI",
+        "Your personal AI-powered learning assistant.",
+    )
+
+    st.markdown("""
+    ### 🧠 What is UA Quiz AI?
+
+    UA Quiz AI converts your study documents into interactive quizzes
+    to help you learn, practice, and test your knowledge.
+
+    ### ✨ Features
+
+    - 📄 Upload PDF, DOCX, TXT, and Markdown files.
+    - 🤖 Generate quizzes using Gemini AI.
+    - 🎯 Choose question count, difficulty, and language.
+    - ✅ Check answers and view your score.
+    - 📥 Download quiz questions and answers as JSON.
+
+    ### 👨‍💻 Created by
+
+    **Ubaid Ur Rehman**
+
+    *AI Research • Data Analysis • Research & Problem Solving*
+    """)
+
+    st.info(
+        "For AI quiz generation, configure your Gemini API key "
+        "in Streamlit Secrets."
+    )
+
+
+# ============== FOOTER ==============
+
+show_footer()
