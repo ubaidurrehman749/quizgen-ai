@@ -1,7 +1,9 @@
-
+import base64
+import html as htmllib
 import json
 import os
 from difflib import SequenceMatcher
+from pathlib import Path
 
 import streamlit as st
 
@@ -11,11 +13,12 @@ from quiz_engine import create_quiz
 # ============== PAGE CONFIG ==============
 
 st.set_page_config(
-    page_title="UA Quiz AI",
+    page_title="PDF to Quiz AI · StudySpark AI",
     page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
+
+OWNER_NAME = "Ubaid ur Rehman"
 
 # ============== SESSION STATE ==============
 
@@ -30,455 +33,89 @@ for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-# ============== CUSTOM DESIGN ==============
+ss = st.session_state
+
+
+# ============== LOGO ==============
+
+def logo_tag():
+    mimes = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".svg": "image/svg+xml",
+    }
+    for ext, mime in mimes.items():
+        p = Path(__file__).parent / f"logo{ext}"
+        if p.exists():
+            b64 = base64.b64encode(p.read_bytes()).decode()
+            return (
+                f'<img class="logo" src="data:{mime};base64,{b64}" '
+                f'alt="StudySpark AI logo">'
+            )
+    return '<span class="spark">✦</span>'
+
+
+# ============== STYLING ==============
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap');
+html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stSidebar"], [data-testid="collapsedControl"] { display: none; }
+.block-container { padding-top: 1.2rem; max-width: 1100px; }
 
-/* Tell the browser this is a dark page so built-in widgets match */
-:root {
-    color-scheme: dark;
-}
+.topbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+          padding-bottom:14px; border-bottom:1px solid #DCE4FA; }
+.brand { display:flex; align-items:center; gap:12px; font-family:'Bricolage Grotesque',sans-serif;
+         font-weight:800; font-size:1.45rem; color:#0F1B3D; }
+.brand .logo { height:46px; width:46px; object-fit:contain; border-radius:10px; }
+.brand .spark { color:#06B6D4; font-size:1.6rem; }
+.brand b { color:#4F46E5; }
+.owner { background:#0F1B3D; color:#F2F6FF; padding:8px 16px; border-radius:999px; font-weight:500; font-size:.95rem; }
+.owner b { color:#22D3EE; }
 
-/* Animated Gradient Background */
-.stApp {
-    background: linear-gradient(
-        -45deg,
-        #0f172a,
-        #312e81,
-        #581c87,
-        #164e63,
-        #0f172a
-    );
-    background-size: 400% 400%;
-    animation: gradientMove 15s ease infinite;
-    color: #ffffff;
-    font-family: 'Inter', sans-serif;
-}
+.hero h1 { font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:2.4rem;
+           line-height:1.1; color:#0F1B3D; margin:1.2rem 0 .3rem; letter-spacing:-.02em; }
+.hero p { color:#4A5878; font-size:1.1rem; margin-bottom:.8rem; }
 
-@keyframes gradientMove {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
+.card { background:#fff; border:1px solid #DCE4FA; border-top:5px solid #4F46E5; border-radius:16px;
+        padding:18px 20px; margin-bottom:14px; box-shadow:0 16px 28px -24px rgba(15,27,61,.55); }
+.card h3 { font-family:'Bricolage Grotesque',sans-serif; color:#0F1B3D; margin:0 0 6px; font-size:1.15rem; }
+.card p { color:#4A5878; margin:0; font-size:.98rem; }
 
-[data-testid="stMainBlockContainer"] {
-    background: transparent;
-}
+.rev { background:#fff; border:1px solid #DCE4FA; border-left:6px solid #16A34A; border-radius:12px;
+       padding:10px 14px; margin:6px 0; color:#0F1B3D; }
+.rev.bad { border-left-color:#DC2626; }
+.rev small { color:#4A5878; }
 
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #111827, #1e1b4b, #3b0764);
-    border-right: 1px solid #273451;
-}
-
-[data-testid="stHeader"] {
-    background: rgba(11, 16, 32, 0.85);
-}
-
-/* ===== BRIGHT TEXT EVERYWHERE ===== */
-
-/* Normal text, lists, bold, italic */
-[data-testid="stMarkdownContainer"],
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stMarkdownContainer"] li,
-[data-testid="stMarkdownContainer"] span,
-[data-testid="stMarkdownContainer"] strong,
-[data-testid="stMarkdownContainer"] em,
-[data-testid="stText"],
-.stApp p,
-.stApp li {
-    color: #ffffff;
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6,
-[data-testid="stHeading"],
-[data-testid="stMarkdownContainer"] h1,
-[data-testid="stMarkdownContainer"] h2,
-[data-testid="stMarkdownContainer"] h3,
-[data-testid="stMarkdownContainer"] h4 {
-    color: #ffffff !important;
-}
-
-/* Widget labels (selectbox, radio, file uploader, text input, ...) */
-[data-testid="stWidgetLabel"],
-[data-testid="stWidgetLabel"] p,
-[data-testid="stWidgetLabel"] span,
-.stApp label,
-.stApp label p {
-    color: #ffffff !important;
-    font-weight: 600;
-}
-
-/* Radio and checkbox answer options */
-[data-testid="stRadio"] label,
-[data-testid="stRadio"] label p,
-[data-testid="stRadio"] label span,
-[data-testid="stRadio"] div[role="radiogroup"] label div {
-    color: #ffffff !important;
-    font-size: 16px;
-}
-
-/* Captions (small grey text) */
-[data-testid="stCaptionContainer"],
-[data-testid="stCaptionContainer"] p,
-.stApp small {
-    color: #e2e8f0 !important;
-}
-
-/* Sidebar text */
-[data-testid="stSidebar"] p,
-[data-testid="stSidebar"] span,
-[data-testid="stSidebar"] label,
-[data-testid="stSidebar"] div {
-    color: #ffffff;
-}
-
-/* Input boxes and dropdowns: dark box, white text */
-[data-baseweb="select"] > div,
-[data-baseweb="input"] > div,
-[data-baseweb="base-input"],
-.stTextInput input,
-.stTextArea textarea {
-    background-color: rgba(15, 23, 42, 0.85) !important;
-    color: #ffffff !important;
-    border-color: #6754a5 !important;
-}
-
-[data-baseweb="select"] span,
-[data-baseweb="select"] div {
-    color: #ffffff !important;
-}
-
-[data-baseweb="select"] svg {
-    fill: #ffffff !important;
-}
-
-input::placeholder,
-textarea::placeholder {
-    color: #cbd5e1 !important;
-    opacity: 1;
-}
-
-/* Dropdown list that opens under a selectbox */
-[data-baseweb="popover"],
-[data-baseweb="popover"] ul,
-[data-baseweb="menu"] {
-    background-color: #1e1b4b !important;
-}
-
-[data-baseweb="popover"] li,
-[data-baseweb="popover"] li div,
-[data-baseweb="popover"] li span,
-[data-baseweb="menu"] li,
-[data-baseweb="menu"] li div,
-[data-baseweb="menu"] li span {
-    color: #ffffff !important;
-}
-
-[data-baseweb="popover"] li:hover,
-[data-baseweb="menu"] li:hover {
-    background-color: #4f46e5 !important;
-}
-
-/* Metrics (Score, Percentage, ...) */
-[data-testid="stMetricLabel"],
-[data-testid="stMetricLabel"] p,
-[data-testid="stMetricLabel"] div {
-    color: #e2e8f0 !important;
-    font-weight: 600;
-}
-
-[data-testid="stMetricValue"],
-[data-testid="stMetricValue"] div {
-    color: #ffffff !important;
-    font-weight: 800;
-}
-
-/* Message boxes (success, error, info, warning): dark box, white text */
-[data-testid="stAlert"] {
-    background-color: rgba(15, 23, 42, 0.88) !important;
-    border: 1px solid #67e8f9;
-    border-radius: 12px;
-}
-
-[data-testid="stAlert"] p,
-[data-testid="stAlert"] div,
-[data-testid="stAlert"] span,
-[data-testid="stAlert"] li {
-    color: #ffffff !important;
-}
-
-/* Expander (Technical Details) */
-[data-testid="stExpander"] {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid #6754a5;
-    border-radius: 12px;
-}
-
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p,
-[data-testid="stExpander"] summary span {
-    color: #ffffff !important;
-}
-
-/* Code blocks */
-[data-testid="stCode"],
-[data-testid="stCode"] pre,
-[data-testid="stCode"] code {
-    background-color: #0b1020 !important;
-    color: #a5f3fc !important;
-}
-
-/* Bordered containers (quiz result cards) and the quiz form */
-[data-testid="stVerticalBlockBorderWrapper"],
-[data-testid="stForm"] {
-    background: rgba(15, 23, 42, 0.45);
-    border-color: #6754a5 !important;
-    border-radius: 14px;
-}
-
-/* ===== CUSTOM CARDS ===== */
-
-.ua-header {
-    background: linear-gradient(120deg, #111827, #312e81, #6d28d9);
-    border: 1px solid #6754a5;
-    border-radius: 20px;
-    padding: 25px 15px;
-    margin-bottom: 28px;
-    text-align: center;
-    box-shadow: 0 12px 35px rgba(0,0,0,0.22);
-}
-
-.ua-header h1 {
-    font-size: clamp(28px, 5vw, 43px);
-    font-weight: 800;
-    color: #ffffff !important;
-    margin: 0;
-}
-
-.ua-header h1 span {
-    color: #a5f3fc !important;
-}
-
-.ua-header p {
-    color: #f5f3ff !important;
-    font-size: 15px;
-    line-height: 1.7;
-}
-
-.hero-title {
-    font-size: clamp(27px, 4vw, 42px);
-    font-weight: 800;
-    color: #ffffff !important;
-}
-
-.hero-title span {
-    color: #c4b5fd !important;
-}
-
-.hero-subtitle {
-    color: #f1f5f9 !important;
-    font-size: 15px;
-    line-height: 1.8;
-}
-
-.section-card {
-    background: rgba(24,36,65,0.78);
-    border: 1px solid #33446b;
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 16px;
-}
-
-.section-card h3 {
-    color: #e9d5ff !important;
-}
-
-.section-card p {
-    color: #f1f5f9 !important;
-    font-size: 15px;
-}
-
-div.stButton > button,
-div.stFormSubmitButton > button,
-div.stDownloadButton > button,
-[data-testid="stFileUploaderDropzone"] button {
-    background: linear-gradient(100deg, #7c3aed, #4f46e5, #06b6d4);
-    background-size: 200% 200%;
-    border-radius: 12px;
-    border: 1px solid #8b5cf6;
-    color: #ffffff !important;
-    font-weight: 700;
-    min-height: 44px;
-    transition: all 0.3s ease;
-}
-
-div.stButton > button p,
-div.stFormSubmitButton > button p,
-div.stDownloadButton > button p,
-[data-testid="stFileUploaderDropzone"] button span {
-    color: #ffffff !important;
-}
-
-div.stButton > button:hover,
-div.stFormSubmitButton > button:hover,
-div.stDownloadButton > button:hover,
-[data-testid="stFileUploaderDropzone"] button:hover {
-    background-position: 100% 50%;
-    border-color: #67e8f9;
-    color: #ffffff !important;
-    transform: translateY(-2px);
-}
-
-div[data-testid="stMetric"] {
-    background: rgba(24,36,65,0.78);
-    border: 1px solid #33446b;
-    border-radius: 14px;
-    padding: 16px;
-}
-
-hr {
-    border-color: #4b5d8a;
-}
-
-.ua-footer {
-    background: linear-gradient(135deg, #111827, #1e1b4b);
-    border: 1px solid #373064;
-    border-top: 3px solid #8b5cf6;
-    border-radius: 16px;
-    padding: 24px 12px;
-    text-align: center;
-    margin-top: 45px;
-}
-
-.ua-footer h3 {
-    color: #a5f3fc !important;
-}
-
-.ua-footer p {
-    color: #f1f5f9 !important;
-    font-size: 14px;
-    line-height: 1.7;
-}
-
-.ua-footer .creator {
-    color: #a5f3fc !important;
-    font-size: 18px;
-    font-weight: 800;
-}
-
-.ua-footer .copyright {
-    color: #cbd5e1 !important;
-    font-size: 12px;
-}
-
-@media (max-width: 640px) {
-    .ua-header { padding: 20px 10px; }
-    .hero-card { padding: 22px 12px; }
-    .section-card { padding: 14px; }
-}
-
-.hero-card,
-.feature-card,
-.stat-card,
-.result-card {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 20px;
-    padding: 22px;
-    margin-bottom: 18px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.20);
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.hero-card:hover,
-.feature-card:hover,
-.stat-card:hover,
-.result-card:hover {
-    border-color: rgba(34, 211, 238, 0.65);
-    box-shadow: 0 12px 35px rgba(34, 211, 238, 0.12);
-    transform: translateY(-3px);
-}
-
-/* File uploader */
-[data-testid="stFileUploader"] {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px dashed rgba(34, 211, 238, 0.65);
-    border-radius: 16px;
-    padding: 12px;
-}
-
-[data-testid="stFileUploaderDropzone"] {
-    background: rgba(15, 23, 42, 0.6);
-    border-radius: 12px;
-}
-
-[data-testid="stFileUploader"] small,
-[data-testid="stFileUploader"] span,
-[data-testid="stFileUploader"] p,
-[data-testid="stFileUploaderFileName"] {
-    color: #ffffff !important;
-}
+div.stButton > button, div.stDownloadButton > button, div.stFormSubmitButton > button {
+    border-radius:12px; font-weight:700; padding:.6rem 1rem; }
+div.stButton > button[kind="primary"], div.stDownloadButton > button, div.stFormSubmitButton > button {
+    background:#4F46E5; color:#fff; border:0; }
+div.stButton > button[kind="primary"]:hover, div.stDownloadButton > button:hover,
+div.stFormSubmitButton > button:hover { background:#3D35C4; color:#fff; }
+[data-testid="stMetricValue"] { color:#4F46E5; font-family:'Bricolage Grotesque',sans-serif; }
+[data-testid="stFileUploader"] { border-radius:14px; }
+.stTabs [data-baseweb="tab"] { font-weight:700; }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ============== HEADER / HERO / FOOTER ==============
-
-def show_header():
-    st.markdown("""
-    <div class="ua-header">
-        <h1>🧠 UA <span>Quiz AI</span></h1>
-        <p>
-            AI-POWERED LEARNING PLATFORM<br>
-            Transform Documents into Smart Interactive Quizzes
-            <br>
-            Learn Smarter. Practice Better. Achieve More.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def show_hero(
-    title="Welcome to <span>UA Quiz AI</span> 🧠",
-    subtitle=(
-        "Turn your study material into interactive quizzes."
-        "<br>Test your knowledge and track your performance."
-    ),
-):
-    st.markdown(f"""
-    <div class="hero-card">
-        <div class="hero-title">{title}</div>
-        <div class="hero-subtitle">{subtitle}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-def show_footer():
-    st.markdown("""
-    <div class="ua-footer">
-        <h3>🧠 UA Quiz AI</h3>
-        <p>AI-Powered Smart Quiz Generator</p>
-        <p>Designed &amp; Developed with ❤️ by</p>
-        <p class="creator">Ubaid Ur Rehman</p>
-        <p>Learn Smarter with AI</p>
-        <p class="copyright">
-            © 2026 UA Quiz AI. All Rights Reserved.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown(f"""
+<div class="topbar">
+  <div class="brand">{logo_tag()}<span>StudySpark <b>AI</b></span></div>
+  <div class="owner">Created by <b>{OWNER_NAME}</b></div>
+</div>
+<div class="hero">
+  <h1>PDF to Quiz AI</h1>
+  <p>Upload your notes, get a quiz in seconds, and check your score with explanations.</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ============== HELPERS ==============
-
-def go_to_generator():
-    st.session_state["ua_navigation"] = "📝 Quiz Generator"
-
 
 def is_answer_correct(user_answer, correct_answer, has_options):
     if not isinstance(user_answer, str) or not user_answer.strip():
@@ -516,6 +153,96 @@ def validate_quiz(quiz):
             raise ValueError(f"Question {index + 1} has no valid answer.")
 
 
+def clear_question_keys():
+    for k in [k for k in ss.keys() if k.startswith("ua_question_")]:
+        del ss[k]
+
+
+def evaluate(quiz, answers):
+    details = []
+    score = 0
+
+    for index, item in enumerate(quiz.get("questions", [])):
+        user_answer = answers.get(index)
+        if isinstance(user_answer, str):
+            user_answer = user_answer.strip()
+
+        ok = is_answer_correct(user_answer, item["answer"], bool(item.get("options")))
+        score += 1 if ok else 0
+
+        details.append({
+            "question": item["question"],
+            "your_answer": user_answer or "",
+            "correct_answer": item["answer"],
+            "correct": ok,
+            "explanation": item.get("explanation", ""),
+        })
+
+    total = len(details)
+    return {
+        "title": quiz.get("title", "Your Quiz"),
+        "score": score,
+        "total": total,
+        "percentage": round(score / total * 100) if total else 0,
+        "details": details,
+    }
+
+
+def retry_quiz():
+    clear_question_keys()
+    ss["answers"] = {}
+    ss["submitted"] = False
+    ss["last_result"] = None
+
+
+def new_quiz():
+    retry_quiz()
+    ss["quiz"] = None
+
+
+def render_results(result, prefix):
+    pct = result["percentage"]
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Score", f"{result['score']} / {result['total']}")
+    m2.metric("Percentage", f"{pct}%")
+    m3.metric("Wrong or skipped", result["total"] - result["score"])
+    st.progress(pct / 100)
+
+    if pct >= 80:
+        st.success("Excellent work. You know this material well.")
+    elif pct >= 50:
+        st.warning("Good effort. Review the questions you missed and try again.")
+    else:
+        st.error("Needs more revision. Read your notes again, then retry the quiz.")
+
+    st.download_button(
+        "Download results (.json)",
+        json.dumps(result, ensure_ascii=False, indent=2),
+        file_name="quiz-results.json",
+        mime="application/json",
+        key=f"dl_{prefix}",
+        use_container_width=True,
+    )
+
+    st.markdown("#### Review")
+    for index, d in enumerate(result["details"], start=1):
+        icon = "✅" if d["correct"] else "❌"
+        short = d["question"][:80] + ("…" if len(d["question"]) > 80 else "")
+        with st.expander(f"{icon} Question {index}: {short}"):
+            st.write(d["question"])
+            yours = d["your_answer"] or "Not answered"
+            st.markdown(
+                f'<div class="rev {"" if d["correct"] else "bad"}"><small>Your answer</small><br>'
+                f'{htmllib.escape(yours)}</div>'
+                f'<div class="rev"><small>Correct answer</small><br>'
+                f'{htmllib.escape(d["correct_answer"])}</div>',
+                unsafe_allow_html=True,
+            )
+            if d["explanation"]:
+                st.info(d["explanation"])
+
+
 # ============== API KEY ==============
 
 try:
@@ -526,150 +253,43 @@ except Exception:
 api_key = api_key or os.getenv("GEMINI_API_KEY", "")
 
 
-# ============== SIDEBAR ==============
+# ============== TABS ==============
 
-with st.sidebar:
-    st.markdown("## 🧠 UA Quiz AI")
-    st.caption("Your AI-powered learning companion")
-    st.divider()
+tab_create, tab_results, tab_about = st.tabs(
+    ["① Create & take quiz", "② My results", "③ About"]
+)
 
-    navigation_options = [
-        "🏠 Home",
-        "📝 Quiz Generator",
-        "📊 My Results",
-        "ℹ️ About",
-    ]
-
-    page = st.radio(
-        "NAVIGATION",
-        navigation_options,
-        key="ua_navigation",
-        label_visibility="collapsed",
-    )
-
-    st.divider()
-
-    st.markdown("**⚡ Powered by Gemini AI**")
-    st.caption("Upload. Generate. Learn.")
-    st.divider()
-    st.caption("Created by Ubaid Ur Rehman")
-
-
-# ============== GLOBAL HEADER ==============
-
-show_header()
-
-
-# ============== HOME PAGE ==============
-
-if page == "🏠 Home":
-
-    show_hero()
-
-    st.subheader("Welcome to Your AI Learning Workspace")
-
-    st.write(
-        "Generate quizzes from your study materials, "
-        "test your knowledge, and review your performance."
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("""
-        <div class="section-card">
-            <h3>📄 Smart Upload</h3>
-            <p>Upload PDF, Word, text and Markdown documents.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("""
-        <div class="section-card">
-            <h3>🤖 AI Quiz Generator</h3>
-            <p>Turn your documents into interactive quizzes.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col3:
-        st.markdown("""
-        <div class="section-card">
-            <h3>📊 Instant Results</h3>
-            <p>Check your score and review correct answers.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("### 🚀 Ready to Get Started?")
-
-    st.write("Open the quiz generator to create your first quiz.")
-
-    st.button(
-        "🚀 Open Quiz Generator",
-        use_container_width=True,
-        on_click=go_to_generator,
-    )
-
-
-# ============== QUIZ GENERATOR ==============
-
-elif page == "📝 Quiz Generator":
-
-    show_hero()
-
-    st.subheader("📝 Create Your Quiz")
-
-    st.caption(
-        "Upload your study material and customize your quiz settings."
-    )
+# ======================= CREATE & TAKE =======================
+with tab_create:
 
     if not api_key:
         st.warning(
-            "Gemini API key missing. Add GEMINI_API_KEY "
-            "to your Streamlit app Secrets."
+            "Gemini API key missing. Add GEMINI_API_KEY to your Streamlit app Secrets."
         )
 
     uploaded_file = st.file_uploader(
-        "📂 Upload Your Document",
+        "📂 Upload your document (PDF, Word, TXT or Markdown)",
         type=["pdf", "docx", "txt", "md"],
-        help="Supported formats: PDF, Word, TXT and Markdown.",
         key="ua_document_upload",
     )
 
     if uploaded_file:
         st.success(f"Selected file: {uploaded_file.name}")
 
-    st.markdown("### ⚙️ Customize Your Quiz")
+    st.markdown("#### ⚙️ Customize your quiz")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        question_count = st.selectbox(
-            "Number of Questions",
-            [5, 10, 15, 20, 30, 50],
-            index=1,
-        )
-
-        question_type = st.selectbox(
-            "Question Type",
-            ["MCQ", "True/False", "Short Answer"],
-        )
+        question_count = st.selectbox("Number of questions", [5, 10, 15, 20, 30, 50], index=1)
+        question_type = st.selectbox("Question type", ["MCQ", "True/False", "Short Answer"])
 
     with col2:
-        language = st.selectbox(
-            "Quiz Language",
-            ["English", "Urdu"],
-        )
+        language = st.selectbox("Quiz language", ["English", "Urdu"])
+        difficulty = st.selectbox("Difficulty level", ["Easy", "Medium", "Hard"])
 
-        difficulty = st.selectbox(
-            "Difficulty Level",
-            ["Easy", "Medium", "Hard"],
-        )
-
-    if st.button(
-        "✨ Generate My Quiz",
-        use_container_width=True,
-        key="generate_quiz_button",
-    ):
+    if st.button("✨ Generate my quiz", type="primary", use_container_width=True,
+                 key="generate_quiz_button"):
 
         if not uploaded_file:
             st.error("Please upload a document first.")
@@ -684,8 +304,7 @@ elif page == "📝 Quiz Generator":
 
                 if not document_text or not document_text.strip():
                     raise ValueError(
-                        "No readable text found. "
-                        "Please upload a text-based document."
+                        "No readable text found. Please upload a text-based document."
                     )
 
                 with st.spinner("🤖 AI is creating your quiz..."):
@@ -700,35 +319,32 @@ elif page == "📝 Quiz Generator":
 
                 validate_quiz(quiz)
 
-                st.session_state["quiz"] = quiz
-                st.session_state["answers"] = {}
-                st.session_state["submitted"] = False
-                st.session_state["last_result"] = None
+                clear_question_keys()
+                ss["quiz"] = quiz
+                ss["answers"] = {}
+                ss["submitted"] = False
+                ss["last_result"] = None
 
                 st.success("🎉 Your quiz is ready!")
 
             except Exception as exc:
-                st.error(
-                    "Unable to generate your quiz. "
-                    "Please check your settings and try again."
-                )
+                st.error("Unable to generate your quiz. Please check your settings and try again.")
 
-                with st.expander("Technical Details"):
+                with st.expander("Technical details"):
                     st.code(str(exc))
 
-    # ============== DISPLAY QUIZ ==============
+    # ---------- display quiz ----------
 
-    quiz = st.session_state.get("quiz")
+    quiz = ss.get("quiz")
 
     if quiz:
 
         st.divider()
-
         st.subheader(f"📚 {quiz.get('title', 'Your Quiz')}")
 
         questions = quiz.get("questions", [])
 
-        if not st.session_state.get("submitted", False):
+        if not ss.get("submitted", False):
 
             with st.form("ua_quiz_form"):
 
@@ -736,77 +352,70 @@ elif page == "📝 Quiz Generator":
 
                 for index, item in enumerate(questions):
 
-                    st.markdown(f"### Question {index + 1}")
+                    st.markdown(f"**Question {index + 1}**")
                     st.write(item["question"])
 
                     options = item.get("options", [])
 
                     if options:
                         selected_answers[index] = st.radio(
-                            "Choose Your Answer",
+                            "Choose your answer",
                             options,
                             key=f"ua_question_{index}",
                             index=None,
                         )
                     else:
                         selected_answers[index] = st.text_input(
-                            "Write Your Answer",
+                            "Write your answer",
                             key=f"ua_question_{index}",
                         )
 
                     st.divider()
 
-                submitted = st.form_submit_button(
-                    "✅ Submit My Quiz",
-                    use_container_width=True,
-                )
+                submitted = st.form_submit_button("✅ Submit my quiz", use_container_width=True)
 
                 if submitted:
-                    st.session_state["answers"] = selected_answers
-                    st.session_state["submitted"] = True
+                    ss["answers"] = selected_answers
+                    ss["last_result"] = evaluate(quiz, selected_answers)
+                    ss["submitted"] = True
                     st.rerun()
 
         else:
+            result = ss.get("last_result") or evaluate(quiz, ss.get("answers", {}))
 
-            answers = st.session_state.get("answers", {})
-            score = 0
+            st.markdown("### 📊 Your quiz results")
+            render_results(result, "create")
 
-            st.subheader("📊 Your Quiz Results")
+            b1, b2 = st.columns(2)
+            b1.button("🔁 Retry this quiz", on_click=retry_quiz, use_container_width=True)
+            b2.button("🆕 Create a new quiz", on_click=new_quiz, type="primary",
+                      use_container_width=True)
 
-            for index, item in enumerate(questions):
+# ======================= MY RESULTS =======================
+with tab_results:
+    result = ss.get("last_result")
 
-                user_answer = answers.get(index)
-                correct_answer = item["answer"]
+    if not result:
+        st.info("No results yet. Create a quiz and submit it to see your score here.")
+    else:
+        st.subheader(f"📊 {result['title']}")
+        render_results(result, "results")
 
-                if isinstance(user_answer, str):
-                    user_answer = user_answer.strip()
+# ======================= ABOUT =======================
+with tab_about:
+    st.markdown("""
+    <div class="card"><h3>📄 Smart upload</h3>
+    <p>Upload PDF, Word, TXT or Markdown documents. Scanned PDFs without text are not supported.</p></div>
+    <div class="card"><h3>🤖 AI quiz generator</h3>
+    <p>Choose MCQ, True/False or Short Answer questions, the language, difficulty and number of questions.</p></div>
+    <div class="card"><h3>📊 Instant results</h3>
+    <p>See your score, the correct answers and a short explanation for every question.</p></div>
+    """, unsafe_allow_html=True)
 
-                is_correct = is_answer_correct(
-                    user_answer,
-                    correct_answer,
-                    bool(item.get("options")),
-                )
+    st.caption("Powered by Gemini AI. Quizzes are made from your document only. "
+               "Always double-check important answers with your textbook.")
 
-                if is_correct:
-                    score += 1
-
-                with st.container(border=True):
-
-                    st.markdown(f"### Question {index + 1}")
-                    st.write(item["question"])
-
-                    st.write(
-                        "**Your Answer:** "
-                        f"{user_answer if user_answer else 'Not answered'}"
-                    )
-
-                    st.write(f"**Correct Answer:** {correct_answer}")
-
-                    if is_correct:
-                        st.success("✅ Correct!")
-                    else:
-                        st.error("❌ Incorrect")
-
-                    explanation = item.get("explanation", "")
-
-             
+st.markdown(
+    f"<hr><center style='color:#4A5878'>© StudySpark AI · Created by {OWNER_NAME}</center>",
+    unsafe_allow_html=True,
+)
